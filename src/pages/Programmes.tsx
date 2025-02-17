@@ -25,6 +25,7 @@ import { notifications } from "@mantine/notifications";
 interface ProgrammeType {
   _id: string,
   name: string,
+  description: string,
   day_number: number,
   date: string,
   start_datetime: string,
@@ -34,6 +35,7 @@ interface ProgrammeType {
 
 type ProgrammeValues = {
   name: string,
+  description: string,
   day_number: number,
   date: Date,
   start_datetime: string,
@@ -44,6 +46,7 @@ type ProgrammeValues = {
 // Zod schema for validation
 const programmeSchema = z.object({
   name: z.string().min(3, "Programme name must be at least 3 characters"),
+  description: z.string().min(3, 'Description is required.'),
   day_number: z.number().min(1, "Day number must be positive"),
   date: z.date(),
   start_datetime: z.string().min(1, "Start time is required"),
@@ -139,6 +142,7 @@ function Programmes() {
     validate: zodResolver(programmeSchema),
     initialValues: {
       name: "",
+      description: "",
       day_number: 1,
       date: new Date(),
       start_datetime: "",
@@ -159,6 +163,7 @@ function Programmes() {
     setId(programme._id)
     form.setValues({
       name: programme.name,
+      description: programme.description,
       day_number: programme.day_number,
       date: new Date(programme.date),
       start_datetime: dayjs(programme.start_datetime).format('HH:mm'),
@@ -293,7 +298,8 @@ function Programmes() {
 
 const ProgrammeForm = ({ form, isPending } : { form: UseFormReturnType<ProgrammeValues>, isPending: boolean}) => (
   <Stack>
-    <TextInput label="Programme Name" disabled={isPending} {...form.getInputProps("name")} />
+    <TextInput label="Programme Title" disabled={isPending} {...form.getInputProps("name")} />
+    <TextInput label="Programme Description" disabled={isPending} {...form.getInputProps("description")} />
     <NumberInput hideControls label="Day Number" disabled={isPending} {...form.getInputProps("day_number")} />
     <DatePickerInput label="Date" disabled={isPending} placeholder="Pick a date" {...form.getInputProps("date")} />
     <TimeInput label="Start Time" disabled={isPending} {...form.getInputProps("start_datetime")} />
