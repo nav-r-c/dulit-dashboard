@@ -14,13 +14,17 @@ export const fetchSpeakerById = async (speakerId: string) => {
 
 // Create a new speaker
 export const createSpeaker = async (speakerData: any) => {
-  const response = await apiClient.post('/speakers', speakerData);
+  const response = await apiClient.post('/speakers', speakerData, {
+    headers: { "Content-Type": "application/json" }, // Explicitly set Content-Type
+  });
   return response.data;
 };
 
 // Update a speaker
-export const updateSpeaker = async (speakerId: string, speakerData: any) => {
-  const response = await apiClient.put(`/speakers/${speakerId}`, speakerData);
+export const updateSpeaker = async ({speakerId, speakerData} : {speakerId: string, speakerData: any}) => {
+  const response = await apiClient.put(`/speakers/${speakerId}`, speakerData, {
+    headers: { "Content-Type": "application/json" }, // Explicitly set Content-Type
+  });
   return response.data;
 };
 

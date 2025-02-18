@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { TextInput, Container, Title, Button, Modal, MultiSelect, Card, Image, Text, Group, Loader } from '@mantine/core';
+import { useState } from 'react';
+import { TextInput, Container, Title, Button, Modal, MultiSelect, Card, Image, Text, Group, Loader, FileInput } from '@mantine/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../apiClient';
 import { useDisclosure } from '@mantine/hooks';
@@ -7,163 +7,192 @@ import { z } from 'zod';
 import { useForm, zodResolver } from '@mantine/form';
 import { fetchProgrammes } from '../request/programme-query';
 import { fetchSpeakers, createSpeaker, updateSpeaker, deleteSpeaker } from '../request/speaker-query';
+import { notifications } from '@mantine/notifications';
+import { IconX } from '@tabler/icons-react';
 
-// Zod schema for speaker validation
 const speakerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   bio: z.string().min(1, "Bio is required"),
   programmes: z.array(z.string()).min(1, "At least one programme is required"),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().url(),
 });
 
 export default function Speakers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpeaker, setSelectedSpeaker] = useState<any | null>(null);
   const [imageUrl, setImageUrl] = useState('');
-
+  const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
-  
-  // Corrected useQuery with the new signature (using queryKey and queryFn)
-  const { data: speakers, isPending  } = useQuery({
+
+  const { data: speakers, isPending } = useQuery({
     queryKey: ['speakers'],
     queryFn: fetchSpeakers,
   });
 
   const { data: programmesFetched } = useQuery({
-    queryKey: ["programmes"],
+    queryKey: ['programmes'],
     queryFn: fetchProgrammes,
   });
 
-  const programmesList = programmesFetched?.map((programme: any) => {
-    return `Day ${programme.day_number} - ${programme.name}`;
-  });
+  // Map fetched programmes to the format required by MultiSelect
+  const programmesList = (programmesFetched || []).map((programme: any) => ({
+    label: `Day ${programme.day_number} - ${programme.name}`,
+    value: programme._id, // Ensure the value is the ID
+  }));
 
-  useEffect(() => {
-    console.log("Programmes List=>", programmesList);
-  }, [programmesList]);
-
-  // Modal controls
   const [openedCreate, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [openedEdit, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false);
 
-  // Initialize useForm hook with Zod schema validation
   const form = useForm({
     validate: zodResolver(speakerSchema),
     initialValues: {
       name: '',
       bio: '',
-      programmes: [],
+      programmes: [] as string[], // This will store only the programme IDs
       imageUrl: '',
     },
   });
 
-  // Handle search input
-  const handleSearchChange = (term: string) => {
-    setSearchTerm(term);
-  };
-
-  // Handle image upload
-  const handleImageUpload = async (event: any) => {
-    const file = event.target.files[0];
+  const handleImageUploadForUpdate = async (file: File | null) => {
+    if (!file) return;
+    setIsUploading(true);
+  
     const formData = new FormData();
     formData.append('image', file);
-
-    // Send the image to your Flask server for imgBB upload
-    const response = await apiClient.post('/upload-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (response.status === 200) {
-      setImageUrl(response.data.url); // Set the image URL returned by Flask server
-    } else {
-      alert('Image upload failed');
+  
+    try {
+      const response = await apiClient.post('/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+  
+      if (response.status === 200) {
+        setImageUrl(response.data.url);
+        form.setFieldValue('imageUrl', response.data.url); // Update the form state
+      } else {
+        notifications.show({
+          title: "Error",
+          message: "Please try again later.",
+          color: "red",
+          icon: <IconX size={16} />,
+        });
+      }
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setIsUploading(false);
     }
   };
+  
 
-  // Handle create speaker mutation
   const createMutation = useMutation({
     mutationFn: createSpeaker,
-    mutationKey: ['create-speaker'], 
+    mutationKey: ['create-speaker'],
     onSuccess: () => {
-      queryClient.invalidateQueries(['speakers']);
+      queryClient.invalidateQueries({ queryKey: ['speakers'] });
       closeCreate();
     },
   });
 
-  // Handle update speaker mutation
   const updateMutation = useMutation({
     mutationFn: updateSpeaker,
-    mutationKey: ['update-speaker'], 
+    mutationKey: ['update-speaker'],
     onSuccess: () => {
-      queryClient.invalidateQueries(['speakers']);
+      queryClient.invalidateQueries({ queryKey: ['speakers'] });
       closeEdit();
     },
   });
 
-  // Handle delete speaker mutation
   const deleteMutation = useMutation({
     mutationFn: deleteSpeaker,
-    mutationKey: ['delete-speaker'], 
+    mutationKey: ['delete-speaker'],
     onSuccess: () => {
-      queryClient.invalidateQueries(['speakers']);
+      queryClient.invalidateQueries({ queryKey: ['speakers'] });
       closeDelete();
     },
   });
 
-  // Handle modal open and close for create
   const openCreateSpeaker = () => {
     form.reset();
     setImageUrl('');
     openCreate();
   };
 
-  // Handle modal open and close for edit
   const openEditSpeaker = (speaker: any) => {
     setSelectedSpeaker(speaker);
     form.setValues({
       name: speaker.name,
       bio: speaker.bio,
-      programmes: speaker.programmes.map((prog: any) => prog.toString()), // Assuming programmes are ObjectIds
+      programmes: speaker.programmes,
       imageUrl: speaker.imageUrl,
     });
+    setImageUrl(speaker.imageUrl);
     openEdit();
   };
 
-  // Handle modal open and close for delete
   const openDeleteSpeaker = (speakerId: any) => {
-    setSelectedSpeaker({ id: speakerId });
+    setSelectedSpeaker({ _id: speakerId });
     openDelete();
   };
+
+  console.log(form.errors)
+  console.log(form.getValues())
+  const handleSubmit = async (values: any) => {
+    const selectedProgrammesIds = values.programmes.map((programme: any) => programme);
+    createMutation.mutate({
+      ...values,
+      programmes: selectedProgrammesIds,
+    });
+  };
+
+  const handleUpdateSpeaker = async (values: any) => {
+    const { name, bio } = values;
+    const selectedProgrammesIds = values.programmes.map((programme: any) => programme);
+  
+    const updatedData = {
+      name,
+      bio,
+      programmes : selectedProgrammesIds,
+      imageUrl: imageUrl || selectedSpeaker?.imageUrl, // Use the existing image URL if no new image
+    };
+  
+    // Pass the correct speaker ID in the mutation
+    updateMutation.mutate({
+      speakerId: selectedSpeaker?._id,  // Ensure you're passing the correct speaker ID
+      speakerData: updatedData
+    });
+    
+  };
+  
 
   return (
     <Container>
       <Title order={2} mb="md">Speakers</Title>
 
-      {/* Search Input */}
       <TextInput
         placeholder="Search by speaker name or id"
         value={searchTerm}
-        onChange={(e) => handleSearchChange(e.target.value)}
+        onChange={(e) => setSearchTerm(e.target.value)}
         mb="lg"
       />
 
-      {/* Add New Speaker Button */}
       <Button onClick={openCreateSpeaker} mb="md">Add New Speaker</Button>
 
-      {/* Speakers List */}
       {isPending ? (
         <Loader />
       ) : (
         speakers
-          .filter((speaker: any) => speaker.name.toLowerCase().includes(searchTerm.toLowerCase()) || speaker.id.includes(searchTerm))
-          .map((speaker: any, index: number) => (
-            <Card key={speaker.id} shadow="sm" padding="lg" mb="md">
+          .filter((speaker: any) =>
+            speaker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            speaker._id.includes(searchTerm)
+          )
+          .map((speaker: any) => (
+            <Card key={speaker._id} shadow="sm" padding="lg" mb="md">
               <Group justify="apart">
-                <Image src={speaker.imageUrl} alt={speaker.name} width={100} height={100} />
-                <Text>{`Day ${index + 1} - ${speaker.name}`}</Text>
+                <Image src={speaker.imageUrl} alt={speaker.name} width={200} height={200} />
+                <Text>{speaker.name}</Text>
                 <Button onClick={() => openEditSpeaker(speaker)}>Edit</Button>
-                <Button color="red" onClick={() => openDeleteSpeaker(speaker.id)}>Delete</Button>
+                <Button color="red" onClick={() => openDeleteSpeaker(speaker._id)}>Delete</Button>
               </Group>
             </Card>
           ))
@@ -171,18 +200,21 @@ export default function Speakers() {
 
       {/* Create Speaker Modal */}
       <Modal opened={openedCreate} onClose={closeCreate} title="Create New Speaker">
-        <form onSubmit={form.onSubmit((values) => createMutation.mutate(values))}>
+        <form onSubmit={form.onSubmit(handleSubmit)}>
           <TextInput label="Name" {...form.getInputProps('name')} mb="md" />
           <TextInput label="Bio" {...form.getInputProps('bio')} mb="md" />
           <MultiSelect
             label="Programmes"
-            data={programmesList}
-            {...form.getInputProps('programmes')}
+            data={programmesList || []}
+            value={form.values.programmes}
+            onChange={(value: string[]) => form.setFieldValue('programmes', value)}
             mb="md"
           />
-          <input type="file" onChange={handleImageUpload} />
-          {imageUrl && <Image src={imageUrl} alt="Image preview" width={100} height={100} />}
-          <Button type="submit" loading={createMutation.isPending}>
+
+          <FileInput label="Upload Image" accept="image/*" onChange={handleImageUploadForUpdate} mb="md" />
+          {imageUrl && <Image src={imageUrl} alt="Preview" width={200} height={200} mb="md" />}
+
+          <Button type="submit" loading={createMutation.isPending || isUploading}>
             Create Speaker
           </Button>
         </form>
@@ -190,27 +222,36 @@ export default function Speakers() {
 
       {/* Edit Speaker Modal */}
       <Modal opened={openedEdit} onClose={closeEdit} title="Edit Speaker">
-        <form onSubmit={form.onSubmit((values) => updateMutation.mutate(selectedSpeaker?.id, values))}>
+        <form onSubmit={form.onSubmit(handleUpdateSpeaker)}>
           <TextInput label="Name" {...form.getInputProps('name')} mb="md" />
           <TextInput label="Bio" {...form.getInputProps('bio')} mb="md" />
           <MultiSelect
+            searchable
             label="Programmes"
-            data={programmesList}
-            {...form.getInputProps('programmes')}
+            data={programmesList || []}  // Use synchronous data here
+            value={form.values.programmes}
+            onChange={(value) => form.setFieldValue('programmes', value)}
             mb="md"
           />
-          <input type="file" onChange={handleImageUpload} />
-          {imageUrl && <Image src={imageUrl} alt="Image preview" width={100} height={100} />}
-          <Button type="submit" loading={updateMutation.isPending}>
+          
+
+          <FileInput label="Upload New Image" accept="image/*" onChange={handleImageUploadForUpdate} mb="md" />
+          {imageUrl && <Image src={imageUrl} alt="Preview" width={200} height={200} mb="md" />}
+
+          <Button type="submit" loading={updateMutation.isPending || isUploading}>
             Update Speaker
           </Button>
         </form>
       </Modal>
 
-      {/* Delete Speaker Confirmation Modal */}
+      {/* Delete Speaker Modal */}
       <Modal opened={openedDelete} onClose={closeDelete} title="Delete Speaker">
         <Text>Are you sure you want to delete this speaker?</Text>
-        <Button color="red" onClick={() => deleteMutation.mutate(selectedSpeaker?.id)} loading={deleteMutation.isPending}>
+        <Button
+          color="red"
+          onClick={() => deleteMutation.mutate(selectedSpeaker?._id)}
+          loading={deleteMutation.isPending}
+        >
           Delete
         </Button>
       </Modal>
