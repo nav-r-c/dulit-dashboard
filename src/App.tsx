@@ -1,5 +1,5 @@
 import { AppShell } from '@mantine/core';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Programmes from './pages/Programmes';
 import Speakers from './pages/Speakers';
@@ -19,7 +19,7 @@ function App() {
 
       <AppShell.Main>
         <Routes>
-          <Route path="/" element={<Programmes />} />
+          <Route path="*" element={<Navigate to={'/programmes'} replace />} />
           <Route path="/programmes" element={<Programmes />} />
           <Route path="/speakers" element={<Speakers />} />
         </Routes>
