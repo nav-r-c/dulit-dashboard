@@ -127,6 +127,7 @@ export default function Speakers() {
       bio: speaker.bio,
       programmes: speaker.programmes,
       imageUrl: speaker.imageUrl,
+      priority: speaker.priority,
     });
     setImageUrl(speaker.imageUrl);
     openEdit();
@@ -148,12 +149,10 @@ export default function Speakers() {
   };
 
   const handleUpdateSpeaker = async (values: any) => {
-    const { name, bio } = values;
     const selectedProgrammesIds = values.programmes.map((programme: any) => programme);
   
     const updatedData = {
-      name,
-      bio,
+      ...values,
       programmes : selectedProgrammesIds,
       imageUrl: imageUrl || selectedSpeaker?.imageUrl, // Use the existing image URL if no new image
     };
