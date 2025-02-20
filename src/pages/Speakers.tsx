@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TextInput, Container, Title, Button, Modal, MultiSelect, Card, Image, Text, Group, Loader, FileInput } from '@mantine/core';
+import { TextInput, Container, Title, Button, Modal, MultiSelect, Card, Image, Text, Group, Loader, FileInput, NumberInput } from '@mantine/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../apiClient';
 import { useDisclosure } from '@mantine/hooks';
@@ -15,6 +15,7 @@ const speakerSchema = z.object({
   bio: z.string().min(1, "Bio is required"),
   programmes: z.array(z.string()).min(1, "At least one programme is required"),
   imageUrl: z.string().url(),
+  priority: z.number()
 });
 
 export default function Speakers() {
@@ -51,6 +52,7 @@ export default function Speakers() {
       bio: '',
       programmes: [] as string[], // This will store only the programme IDs
       imageUrl: '',
+      priority: 0
     },
   });
 
@@ -203,6 +205,7 @@ export default function Speakers() {
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <TextInput label="Name" {...form.getInputProps('name')} mb="md" />
           <TextInput label="Bio" {...form.getInputProps('bio')} mb="md" />
+          <NumberInput description="Lower Priority means gets displayed first" hideControls label="Priority" {...form.getInputProps('priority')} mb="md" />
           <MultiSelect
             label="Programmes"
             data={programmesList || []}
@@ -225,6 +228,7 @@ export default function Speakers() {
         <form onSubmit={form.onSubmit(handleUpdateSpeaker)}>
           <TextInput label="Name" {...form.getInputProps('name')} mb="md" />
           <TextInput label="Bio" {...form.getInputProps('bio')} mb="md" />
+          <NumberInput description="Lower Priority means gets displayed first" hideControls label="Priority" {...form.getInputProps('priority')} mb="md" />
           <MultiSelect
             searchable
             label="Programmes"
